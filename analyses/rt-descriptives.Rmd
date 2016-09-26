@@ -66,6 +66,22 @@ bstrap <- foreach(i = 1:nbs, .combine=rbind) %dopar% {
 stopCluster(cl)
 ```
 
+Visualize bootstrapping distribution
+
+```{r, fig.height=16, fig.width=12}
+bstrap$orientation <- factor(bstrap$orientation, 
+                             levels=c('Upright', 'Inverted'))
+bstrap$target_presence <- factor(bstrap$target_presence, 
+                              levels=c('Target Present', 'Target Absent'))
+
+ggplot(bstrap, aes(avg, color=familiarity)) + 
+    geom_freqpoly(binwidth=10) + 
+    facet_grid(target_presence*set_size ~ orientation) +
+    theme_bw(base_size=12) +
+    labs(color='Target', x='Reaction Time [ms]', y='Count') +
+    scale_color_brewer(palette='Set1')
+```
+
 ## Plot of Average Reaction Times
 
 Now compute confidence intervals and averages from the bootstrapped samples.
