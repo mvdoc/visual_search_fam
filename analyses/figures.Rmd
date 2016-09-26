@@ -1,7 +1,11 @@
 ---
-title: "Visual Search Familiar Faces: Figures"
+title: |
+   | Visual Search Familiar Faces:
+   | Figures and Effect Sizes for Reaction Times
 author: "Matteo Visconti di Oleggio Castello"
-output: pdf_document
+output: 
+    pdf_document:
+        toc: true
 ---
 
 ```{r setup, include=FALSE}
@@ -20,6 +24,7 @@ require(broom)
 require(doParallel)
 require(foreach)
 require(assertthat)
+require(knitr)
 
 data <- read.csv('data.csv')
 data_correct <- data %>% filter(correct == 1)
@@ -104,7 +109,7 @@ ggplot(cis, aes(set_size, avg, ymin=low, ymax=high,
     scale_color_brewer(palette='Set1')
 ```
 
-## Plot of Effect Sizes
+## Plot of Unstandardized Effect Sizes for each Set Size and Condition
 
 
 Compute difference Stranger - Familiar for each bootstrapped sample and obtain
@@ -147,7 +152,7 @@ avg_es$avg <- avg_es$avg - avg_fam$avg
 
 Merge datasets and obtain data frame for plotting.
 ```{r}
-cis_es <- merge(cis_es, avg_es)
+cis_es <- merge(avg_es, cis_es)
 cis_es$orientation <- factor(cis_es$orientation, 
                              levels=c('Upright', 'Inverted'))
 cis_es$target_presence <- factor(cis_es$target_presence, 
@@ -167,4 +172,70 @@ ggplot(cis_es, aes(as.factor(set_size), avg, ymin=low, ymax=high,
     theme_bw() +
     labs(x='Set Size', y='Stranger - Familiar Effect Size [ms]', 
          fill='Orientation')
+```
+
+And these are the plotted data:
+```{r}
+kable(select(cis_es, -familiarity), digits=0)
+```
+
+## Unstandardized Effect Sizes across Set Size
+
+Now we can compute the average effect size across set size.
+
+```{r}
+cis_es_setsize <- 
+    bstrap_es %>%
+    group_by(index, familiarity, orientation, target_presence) %>% 
+    summarise(avg=mean(avg)) %>%
+    group_by(orientation, target_presence) %>%
+    summarise(low=quantile(avg, alpha/2), high=quantile(avg, 1-alpha/2))
+
+avg_es_setsize <- 
+    avg_es %>%
+    group_by(orientation, target_presence) %>% 
+    summarise(avg=mean(avg))
+
+avg_es_setsize <- merge(avg_es_setsize, cis_es_setsize)
+
+kable(avg_es_setsize, digits=0)
+```
+
+And also the average difference between Upright faces and Inverted faces.
+```{r}
+# for each bootstrap, obtain averages across set size
+bstrap_es_setsize <- 
+    bstrap_es %>%
+    group_by(index, orientation, target_presence) %>%
+    summarise(avg=mean(avg)) %>%
+    ungroup() %>%
+    arrange(index, target_presence, orientation) 
+
+# subtract Inverted from Upright for every bootstrap and obtain CIs
+cis_es_setsize_uprinv <- 
+    bstrap_es_setsize %>%
+    group_by(index, target_presence) %>%
+    mutate(avg = avg - lag(avg)) %>%
+    group_by(index, target_presence) %>%
+    # remove rows with NA
+    na.omit() %>%
+    summarise(avg=avg) %>%
+    group_by(target_presence) %>%
+    summarise(low=quantile(avg, alpha/2), high=quantile(avg, 1-alpha/2))
+
+# same for the original dataset
+avg_es_setsize_uprinv <-
+    avg_es_setsize %>%
+    select(orientation, target_presence, avg) %>%
+    ungroup() %>%
+    arrange(target_presence, orientation) %>%
+    group_by(target_presence) %>%
+    mutate(avg = avg - lag(avg)) %>%
+    select(-orientation) %>%
+    na.omit()
+
+avg_es_setsize_uprinv <-
+    avg_es_setsize_uprinv %>% merge(cis_es_setsize_uprinv)
+
+kable(avg_es_setsize_uprinv, digits=0)
 ```
