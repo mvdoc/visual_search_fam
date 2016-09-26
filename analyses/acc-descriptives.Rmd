@@ -1,0 +1,259 @@
+---
+title: |
+   | Visual Search Familiar Faces:
+   | Figures and Effect Sizes for Accuracy
+author: "Matteo Visconti di Oleggio Castello"
+output: 
+    pdf_document:
+        toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
+```
+
+# Figures, Descriptive Statistics, and Effect Sizes for Accuracy
+
+This R markdown file will produce the figures for the manuscript.
+
+Load some useful libraries and load the data.
+```{r}
+require(dplyr)
+require(ggplot2)
+require(doParallel)
+require(foreach)
+require(knitr)
+
+data <- read.csv('data.csv')
+```
+
+Set up some variables that will be used later.
+```{r}
+nproc <- 4  # change this to use more/less processors for parallel use
+seed <- 42  # seed for rng to obtain reproducible results in different runs
+alpha <- .05  # significance level for confidence intervals
+nbs <- 10000  # number of bootstrapping repetitions
+```
+
+## Bootstrapping of the data
+
+Bootstrap data resampling within each condition. 
+It could take a while depending on the number of processors used.
+
+```{r, results='hide', cache=TRUE}
+cl <- makeCluster(nproc)
+registerDoParallel(cl)
+# push required packages to each worker
+clusterCall(cl, function() library(magrittr))
+clusterCall(cl, function() library(plyr))
+clusterCall(cl, function() library(dplyr))
+bstrap <- data.frame()
+set.seed(seed)
+bstrap <- foreach(i = 1:nbs, .combine=rbind) %dopar% {
+    tmp <- 
+        data %>%
+        group_by(orientation, target_presence, familiarity, 
+                 set_size, target_sex, subid) %>%
+        sample_frac(1, replace=T) %>%
+        group_by(orientation, target_presence, familiarity, set_size) %>%
+        summarise(accuracy=sum(correct == 1)/n() * 100)
+    
+    tmp$index <- i
+    tmp
+}
+stopCluster(cl)
+```
+
+Visualize bootstrapping distribution
+
+```{r, fig.height=16, fig.width=12}
+bstrap$orientation <- factor(bstrap$orientation, 
+                             levels=c('Upright', 'Inverted'))
+bstrap$target_presence <- factor(bstrap$target_presence, 
+                              levels=c('Target Present', 'Target Absent'))
+
+ggplot(bstrap, aes(accuracy, color=familiarity)) + 
+    geom_freqpoly(binwidth=.5) + 
+    facet_grid(target_presence*set_size ~ orientation) +
+    theme_bw(base_size=12) +
+    labs(color='Target', x='Accuracy [%]', y='Count') +
+    scale_color_brewer(palette='Set1')
+```
+
+## Plot of Average Accuracy
+ Now compute confidence intervals and averages from the bootstrapped samples.
+
+```{r}
+cis <- 
+    bstrap %>% 
+    group_by(orientation, target_presence, familiarity, set_size) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+# compute average from original data
+avgs <- data %>%
+    group_by(orientation, target_presence, familiarity, set_size) %>%
+    summarise(accuracy=sum(correct == 1)/n() * 100)
+
+cis <- merge(avgs, cis)
+```
+
+Now plot the figure
+
+```{r}
+# first reorder the levels of target_presence and orientation
+cis$orientation <- factor(cis$orientation, levels=c('Upright', 'Inverted'))
+cis$target_presence <- factor(cis$target_presence, 
+                              levels=c('Target Present', 'Target Absent'))
+
+pd = position_dodge(width=1)
+
+ggplot(cis, aes(set_size, accuracy, ymin=low, ymax=high, 
+                color=familiarity)) + 
+    geom_line(alpha=.8, size=1, position=pd) +
+    geom_errorbar(width=0.3,  position=pd)  + 
+    geom_point(position=pd) +
+    facet_grid(target_presence ~ orientation) +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major.y = element_line(colour = "gray30"),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.y = element_blank()) +
+    scale_x_continuous(breaks=c(2, 4, 6)) +
+    labs(x='Set Size', y='Accuracy [%]', color='Target', 
+         linetype='Orientation') +
+    scale_color_brewer(palette='Set1')
+```
+
+These are the plotted values
+```{r}
+kable(cis, digits=2)
+```
+
+## Compute Accuracy across conditions
+
+Accuracy according to target presence. 
+```{r}
+accs_bytp <- 
+    avgs %>%
+    group_by(target_presence) %>%
+    summarise(accuracy=mean(accuracy))
+
+cis_bytp <- 
+    bstrap %>% group_by(index, target_presence) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(target_presence) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+bytp <- merge(accs_bytp, cis_bytp)
+
+kable(bytp, digits=2)
+```
+
+Accuracy according to target orientation.
+```{r}
+accs_byto <- 
+    avgs %>%
+    group_by(orientation) %>%
+    summarise(accuracy=mean(accuracy))
+cis_byto <- 
+    bstrap %>% group_by(index, orientation) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(orientation) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+byto <- merge(accs_byto, cis_byto)
+
+kable(byto, digits=2)
+```
+    
+Accuracy according to set size.
+```{r}
+accs_byss <- 
+    avgs %>%
+    group_by(set_size) %>%
+    summarise(accuracy=mean(accuracy))
+cis_byss <- 
+    bstrap %>% group_by(index, set_size) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(set_size) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+byss <- merge(accs_byss, cis_byss)
+
+kable(byss, digits=2)
+```
+
+Accuracy according to familiarity.
+```{r}
+accs_byfam <- 
+    avgs %>%
+    group_by(familiarity) %>%
+    summarise(accuracy=mean(accuracy))
+cis_byfam <- 
+    bstrap %>% group_by(index, familiarity) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(familiarity) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+byfam <- merge(accs_byfam, cis_byfam)
+kable(byfam, digits=2)
+```
+
+Accuracy according to target presence and set size.
+```{r}
+accs_byssXtp <-
+    avgs %>%
+    group_by(target_presence, set_size) %>%
+    summarise(accuracy=mean(accuracy))
+cis_byssXtp <-
+    bstrap %>% group_by(index, set_size, target_presence) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(target_presence, set_size) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+byssXtp <- merge(accs_byssXtp, cis_byssXtp)
+
+kable(byssXtp, digits=2)
+```
+
+Accuracy according to target orientation and target presence.
+```{r}
+accs_bytoXtp <-
+    avgs %>%
+    group_by(target_presence, orientation) %>%
+    summarise(accuracy=mean(accuracy))
+cis_bytoXtp <-
+    bstrap %>% group_by(index, target_presence, orientation) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(target_presence, orientation) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+bytoXtp <- merge(accs_bytoXtp, cis_bytoXtp)
+
+kable(bytoXtp, digits=2)
+```
+
+Accuracy according to familiarity and target presence.
+
+```{r}
+accs_byfamXtp <-
+    avgs %>%
+    group_by(target_presence, familiarity) %>%
+    summarise(accuracy=mean(accuracy))
+cis_byfamXtp <-
+    bstrap %>% group_by(index, target_presence, familiarity) %>%
+    summarise(accuracy=mean(accuracy)) %>%
+    group_by(target_presence, familiarity) %>%
+    summarise(low=quantile(accuracy, alpha/2), 
+              high=quantile(accuracy, 1-alpha/2))
+
+byfamXtp <- merge(accs_byfamXtp, cis_byfamXtp)
+
+kable(byfamXtp, digits=2)
+```
+
