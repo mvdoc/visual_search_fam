@@ -14,7 +14,10 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 
 # Figures, Descriptive Statistics, and Effect Sizes for Reaction Times
 
-This R markdown file will produce the figures for the manuscript.
+This R markdown file will produce the figures, descriptive statistics, and
+effect sizes for reaction times.
+
+## Setup
 
 Load some useful libraries and load the data.
 ```{r}
@@ -26,6 +29,12 @@ require(assertthat)
 require(knitr)
 
 data <- read.csv('data.csv')
+# set order of levels for plotting
+data$orientation <- factor(data$orientation, 
+                           levels=c('Upright', 'Inverted'))
+data$target_presence <- factor(data$target_presence, 
+                               levels=c('Target Present', 'Target Absent'))
+# get correct trials
 data_correct <- data %>% filter(correct == 1)
 ```
 
@@ -69,11 +78,6 @@ stopCluster(cl)
 Visualize bootstrapping distribution
 
 ```{r, fig.height=16, fig.width=12}
-bstrap$orientation <- factor(bstrap$orientation, 
-                             levels=c('Upright', 'Inverted'))
-bstrap$target_presence <- factor(bstrap$target_presence, 
-                              levels=c('Target Present', 'Target Absent'))
-
 ggplot(bstrap, aes(avg, color=familiarity)) + 
     geom_freqpoly(binwidth=10) + 
     facet_grid(target_presence*set_size ~ orientation) +
@@ -229,12 +233,11 @@ bstrap_es_setsize <-
 # subtract Inverted from Upright for every bootstrap and obtain CIs
 cis_es_setsize_uprinv <- 
     bstrap_es_setsize %>%
+    ungroup() %>%
+    arrange(index, target_presence, orientation) %>%
     group_by(index, target_presence) %>%
-    mutate(avg = avg - lag(avg)) %>%
-    group_by(index, target_presence) %>%
-    # remove rows with NA
+    mutate(avg = lag(avg) - avg) %>%
     na.omit() %>%
-    summarise(avg=avg) %>%
     group_by(target_presence) %>%
     summarise(low=quantile(avg, alpha/2), high=quantile(avg, 1-alpha/2))
 
@@ -245,7 +248,7 @@ avg_es_setsize_uprinv <-
     ungroup() %>%
     arrange(target_presence, orientation) %>%
     group_by(target_presence) %>%
-    mutate(avg = avg - lag(avg)) %>%
+    mutate(avg = lag(avg) - avg) %>%
     select(-orientation) %>%
     na.omit()
 
