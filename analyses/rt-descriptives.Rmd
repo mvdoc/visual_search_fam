@@ -19,14 +19,21 @@ effect sizes for reaction times.
 
 ## Setup
 
-Load some useful libraries and load the data.
+Load some useful libraries, return version information, and load the data.
 ```{r}
-require(dplyr)
-require(ggplot2)
-require(doParallel)
-require(foreach)
-require(assertthat)
-require(knitr)
+# return version information
+version
+packages <- c('dplyr', 
+              'ggplot2', 
+              'doParallel', 
+              'foreach', 
+              'assertthat', 
+              'knitr')
+
+for (package in packages) {
+  require(package, character.only=T)
+  cat(paste(package, packageVersion(package), '\n'))
+}
 
 data <- read.csv('data.csv')
 # set order of levels for plotting

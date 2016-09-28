@@ -20,11 +20,18 @@ This R Markdown file produces descriptive statistics and figures for accuracy.
 
 Load some useful libraries and load the data.
 ```{r}
-require(dplyr)
-require(ggplot2)
-require(doParallel)
-require(foreach)
-require(knitr)
+# return version information
+version
+packages <- c('dplyr', 
+              'ggplot2', 
+              'doParallel', 
+              'foreach', 
+              'knitr')
+
+for (package in packages) {
+  require(package, character.only=T)
+  cat(paste(package, packageVersion(package), '\n'))
+}
 
 data <- read.csv('data.csv')
 ```
