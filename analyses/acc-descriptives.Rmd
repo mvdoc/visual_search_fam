@@ -18,7 +18,7 @@ This R Markdown file produces descriptive statistics and figures for accuracy.
 
 ## Setup
 
-Load some useful libraries and load the data.
+Load some useful libraries, return version information, and load the data.
 ```{r}
 # return version information
 version
