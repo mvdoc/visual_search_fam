@@ -1,8 +1,8 @@
 ---
 title: |
-   | Visual Search Familiar Faces:
+   | Familiarity Facilitates Feature-based Face Processing
    | Figures and Effect Sizes for Reaction Times
-author: "Matteo Visconti di Oleggio Castello"
+author: "Matteo Visconti di Oleggio Castello, Kelsey G. Wheeler, Carlo Cipolli, M. Ida Gobbini"
 output: 
     pdf_document:
         toc: true
@@ -12,12 +12,10 @@ output:
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
 
-# Figures, Descriptive Statistics, and Effect Sizes for Reaction Times
+# Setup
 
 This R markdown file will produce the figures, descriptive statistics, and
 effect sizes for reaction times.
-
-## Setup
 
 Load some useful libraries, return version information, and load the data.
 ```{r}
@@ -53,7 +51,7 @@ alpha <- .05  # significance level for confidence intervals
 nbs <- 10000  # number of bootstrapping repetitions
 ```
 
-## Bootstrapping of the data
+# Bootstrapping of the data
 
 Bootstrap data resampling within each condition. 
 It could take a while depending on the number of processors used.
@@ -93,7 +91,7 @@ ggplot(bstrap, aes(avg, color=familiarity)) +
     scale_color_brewer(palette='Set1')
 ```
 
-## Plot of Average Reaction Times
+# Plot of Average Reaction Times
 
 Now compute confidence intervals and averages from the bootstrapped samples.
 
@@ -135,7 +133,7 @@ ggplot(cis, aes(set_size, avg, ymin=low, ymax=high,
     scale_color_brewer(palette='Set1')
 ```
 
-## Plot of Unstandardized Effect Sizes for each Set Size and Condition
+# Plot of Unstandardized Effect Sizes for each Set Size and Condition
 
 
 Compute difference Stranger - Familiar for each bootstrapped sample and obtain
