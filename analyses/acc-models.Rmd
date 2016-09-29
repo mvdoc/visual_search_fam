@@ -1,0 +1,183 @@
+---
+title: |
+   | Familiarity Facilitates Feature-based Face Processing
+   | Models for Accuracy
+author: "Matteo Visconti di Oleggio Castello, Kelsey G. Wheeler, Carlo Cipolli, M. Ida Gobbini"
+output: 
+    pdf_document:
+        toc: true
+---
+
+# Setup
+
+In this document we'll analyze the accuracy creating Logit Mixed-Effect
+Models separately for Target Present and Target Absent trials.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# return version information
+version
+packages <- c('lme4',
+              'car',
+              'dplyr')
+
+for (package in packages) {
+  require(package, character.only=T)
+  cat(paste(package, packageVersion(package), '\n'))
+}
+
+data <- read.csv('data.csv')
+# set order of levels for plotting
+data$orientation <- factor(data$orientation, 
+                           levels=c('Upright', 'Inverted'))
+data$target_presence <- factor(data$target_presence, 
+                               levels=c('Target Present', 'Target Absent'))
+
+# set set_size as a factor
+data$set_size <- as.factor(data$set_size)
+```
+
+Set up zero-sum contrasts for factors.
+
+```{r}
+contrasts(data$set_size) <- contr.poly(3)
+contrasts(data$orientation) <- c(-1, 1)
+contrasts(data$familiarity) <- c(-1,1)
+contrasts(data$target_sex) <- c(-1,1)
+```
+
+# Model on Target Present Trials
+
+```{r}
+# get target present trials
+data_tp <- data %>%
+    filter(target_presence == 'Target Present')
+```
+
+Try to fit a very general model using the `bobyqa` optimizer (`Nelder_Mead` is
+another option but might not converge sometimes). 
+```{r}
+m1 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 + target_sex | stimuli_combination),
+           family=binomial,
+           data=data_tp,
+           control=glmerControl(optimizer="bobyqa"))
+```
+
+Now we start reducing the random effect structure. First removing the random
+slope for `stimuli_combination`.
+
+```{r}
+m2 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 | stimuli_combination),
+           family=binomial,
+           data=data_tp,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m1, m2)
+```
+
+The two models are not statistically different, thus we keep reducing `m2` by
+entirely removing the random effect for `stimuli_combination`.
+
+```{r}
+m3 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid),  
+           family=binomial,
+           data=data_tp,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m2, m3)
+```
+
+The random effect for `stimuli_combination` doesn't seem to be necessary. We
+thus try to reduce model `m3` further by removing the random slope for 
+`subid`.
+
+```{r}
+m4 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 | subid),  
+           family=binomial,
+           data=data_tp,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m3, m4)
+```
+
+We thus keep model `m4` as our final model. Now we'll test significance of the 
+factors using Type 3 Analysis of Deviance with Wald's $\chi^2$ test.
+```{r}
+Anova(m4, type=3)
+```
+
+# Model on Target Absent Trials
+We'll repeat the same process for Target Absent trials.
+```{r}
+# get target absent trials
+data_ta <- data %>%
+    filter(target_presence == 'Target Absent')
+```
+
+Fit a very general model.
+```{r}
+m1 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 + target_sex | stimuli_combination),
+           family=binomial,
+           data=data_ta,
+           control=glmerControl(optimizer="bobyqa"))
+```
+
+Remove the random slope for `stimuli_combination`.
+
+```{r}
+m2 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 | stimuli_combination),
+           family=binomial,
+           data=data_ta,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m1, m2)
+```
+
+The two models are not statistically different, thus we keep reducing `m2` by
+entirely removing the random effect for `stimuli_combination`.
+
+```{r}
+m3 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid),  
+           family=binomial,
+           data=data_ta,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m2, m3)
+```
+
+The random effect for `stimuli_combination` doesn't seem to be necessary. We
+thus try to reduce model `m3` further by removing the random slope for 
+`subid`.
+
+```{r}
+m4 <- glmer(correct ~ set_size*familiarity*orientation + target_sex + 
+               (1 | subid),  
+           family=binomial,
+           data=data_ta,
+           control=glmerControl(optimizer="bobyqa"))
+
+anova(m3, m4)
+```
+
+For Target Absent trials the random slope for `subid` significantly improves
+the fit of the model. Thus, we keep `m3` as our final model.
+We'll test significance of the factors using Type 3 Analysis of Deviance 
+with Wald's $\chi^2$ test.
+```{r}
+Anova(m3, type=3)
+```
+
