@@ -1,0 +1,170 @@
+---
+title: |
+   | Familiarity Facilitates Feature-based Face Processing
+   | Models for Reaction Times
+author: "Matteo Visconti di Oleggio Castello, Kelsey G. Wheeler, Carlo Cipolli, M. Ida Gobbini"
+output: 
+    pdf_document:
+        toc: true
+---
+
+# Setup
+
+In this document we'll analyze the reaction times creating Linear Mixed-Effect
+Models separately for Target Present and Target Absent trials.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# return version information
+version
+packages <- c('lme4',
+              'car',
+              'dplyr')
+
+for (package in packages) {
+  require(package, character.only=T)
+  cat(paste(package, packageVersion(package), '\n'))
+}
+
+data <- read.csv('data.csv')
+# set order of levels for plotting
+data$orientation <- factor(data$orientation, 
+                           levels=c('Upright', 'Inverted'))
+data$target_presence <- factor(data$target_presence, 
+                               levels=c('Target Present', 'Target Absent'))
+# get correct trials
+data_correct <- data %>% filter(correct == 1)
+
+# set set_size as a factor
+data_correct$set_size <- as.factor(data_correct$set_size)
+```
+
+Set up zero-sum contrasts for factors.
+
+```{r}
+contrasts(data_correct$set_size) <- contr.poly(3)
+contrasts(data_correct$orientation) <- c(-1, 1)
+contrasts(data_correct$familiarity) <- c(-1,1)
+contrasts(data_correct$target_sex) <- c(-1,1)
+```
+
+# Model on Target Present Trials
+
+```{r}
+# get target present trials
+data_correct_tp <- data_correct %>%
+    filter(target_presence == 'Target Present')
+```
+
+Try to fit a very general model: 
+```{r}
+m1 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+             (1 + target_sex | subid) + 
+             (1 + target_sex | stimuli_combination),
+           REML=F, data=data_correct_tp)
+```
+Model `m1` fails to converge, being very complex. We remove the random slope
+for `target_sex` first from the random effects for `stimuli_combination`.
+
+```{r}
+m2 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 | stimuli_combination),
+           REML=F, data=data_correct_tp)
+```
+
+Now reduce the complexity of the random effects structure and test it.
+```{r}
+m3 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid),
+           REML=F, data=data_correct_tp)
+anova(m3, m2)
+```
+
+Model `m2` is better, thus we'll keep the random effect for 
+`stimuli_combination`. Let's remove the random slope for `subid` now.
+
+```{r}
+m4 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 | subid) + (1 | stimuli_combination),
+           REML=F, data=data_correct_tp)
+anova(m4, m2)
+```
+
+Model `m2` is still better, thus we'll keep its random effects structure.
+We'll refit the model with Restricted Maximum Likelihood (REML), and check the
+fitted vs. residual plot with and without log-transformation.
+
+```{r}
+m2_reml <- update(m2, REML=T)
+m2_reml_nolog <- update(m2_reml, RT ~ .)
+
+plot(m2_reml)
+plot(m2_reml_nolog)
+```
+
+The log-transformation seems to work better than no transformation. Now we'll 
+test significance of the factors using Type 3 Analysis of Deviance 
+with Wald's $\chi^2$ test.
+```{r}
+Anova(m2_reml, type=3)
+```
+
+# Model on Target Absent Trials
+```{r}
+# get target absent trials
+data_correct_ta <- data_correct %>%
+    filter(target_presence == 'Target Absent')
+```
+
+Try to fit a very general model: 
+```{r}
+m1 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+             (1 + target_sex | subid) + 
+             (1 + target_sex | stimuli_combination),
+           REML=F, data=data_correct_ta)
+```
+
+Also in this case the general model `m1` fails. We'll thus follow the same 
+steps as with target present trials. We remove the random slope
+for `target_sex` first from the random effects for `stimuli_combination`.
+
+```{r}
+m2 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid) + 
+               (1 | stimuli_combination),
+           REML=F, data=data_correct_ta)
+```
+
+Now we reduce the complexity of the random effects structure and test it.
+```{r}
+m3 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 + target_sex | subid),
+           REML=F, data=data_correct_ta)
+anova(m3, m2)
+```
+
+Model `m2` is better, thus we'll keep the random effect for 
+`stimuli_combination`. Let's remove the random slope for `subid` now.
+
+```{r}
+m4 <- lmer(log(RT) ~ set_size*familiarity*orientation + target_sex + 
+               (1 | subid) + (1 | stimuli_combination),
+           REML=F, data=data_correct_ta)
+anova(m4, m2)
+```
+
+Model `m2` is still better, thus we'll keep its random effects structure. The
+model thus has the same random effects structure as in the target present 
+trials. We'll refit the model with Restricted Maximum Likelihood (REML), 
+and test significance of the factors using Type 3 Analysis of Deviance 
+with Wald's $\chi^2$ test.
+
+```{r}
+m2_reml <- update(m2, REML=T)
+
+Anova(m2_reml, type=3)
+```
