@@ -29,7 +29,7 @@ for (package in packages) {
   cat(paste(package, packageVersion(package), '\n'))
 }
 
-data <- read.csv('data.csv')
+data <- read.csv('../data/data.csv')
 # set order of levels for plotting
 data$orientation <- factor(data$orientation, 
                            levels=c('Upright', 'Inverted'))
