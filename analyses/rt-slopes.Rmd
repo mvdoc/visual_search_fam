@@ -48,7 +48,7 @@ Set up some variables that will be used later.
 nproc <- 4  # change this to use more/less processors for parallel use
 seed <- 42  # seed for rng to obtain reproducible results in different runs
 alpha <- .05  # significance level for confidence intervals
-nbs <- 100  # number of bootstrapping repetitions
+nbs <- 10000  # number of bootstrapping repetitions
 ```
 
 # Functions
