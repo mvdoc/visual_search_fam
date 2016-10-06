@@ -82,7 +82,7 @@ stopCluster(cl)
 
 Visualize bootstrapping distribution
 
-```{r, fig.height=16, fig.width=12}
+```{r, fig.height=10, fig.width=7}
 ggplot(bstrap, aes(avg, color=familiarity)) + 
     geom_freqpoly(binwidth=10) + 
     facet_grid(target_presence*set_size ~ orientation) +
@@ -131,6 +131,35 @@ ggplot(cis, aes(set_size, avg, ymin=low, ymax=high,
     scale_x_continuous(breaks=c(2, 4, 6)) +
     labs(x='Set Size', y='RT [ms]', color='Target', linetype='Orientation') +
     scale_color_brewer(palette='Set1')
+```
+
+## Individual subject's data
+
+```{r, fig.height=12, fig.width=8}
+avgs_subid <- data %>%
+    group_by(subid, orientation, target_presence, familiarity, set_size) %>%
+    summarise(avg=mean(RT))
+
+# reorder the levels of target_presence and orientation
+avgs_subid$orientation <- 
+  factor(avgs_subid$orientation, levels=c('Upright', 'Inverted'))
+avgs_subid$target_presence <- 
+  factor(avgs_subid$target_presence, 
+         levels=c('Target Present', 'Target Absent'))
+
+pd = position_dodge(w=0.2)
+ggplot(avgs_subid, aes(set_size, avg, 
+                color=subid)) + 
+    geom_line(alpha=.8, size=0.3, position=pd) +
+    geom_point(position=pd, size=0.8) +
+    facet_grid(target_presence*familiarity ~ orientation) +
+    theme_bw(base_size=12) +
+    theme(panel.grid.major.y = element_line(colour = "gray30"),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.minor.y = element_blank()) +
+    scale_x_continuous(breaks=c(2, 4, 6)) +
+    labs(x='Set Size', y='RT [ms]', color='Subject')
 ```
 
 # Plot of Unstandardized Effect Sizes for each Set Size and Condition
@@ -194,7 +223,7 @@ ggplot(cis_es, aes(as.factor(set_size), avg, ymin=low, ymax=high,
     facet_grid(~target_presence) +
     scale_fill_brewer(palette='Set2') +
     theme_bw() +
-    labs(x='Set Size', y='Stranger - Familiar Effect Size [ms]', 
+    labs(x='Set Size', y='Stranger - Familiar Unstandardized Effect Size [ms]', 
          fill='Orientation')
 ```
 
